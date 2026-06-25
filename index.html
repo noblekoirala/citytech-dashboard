@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Citytech Device Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg:#0f1117;--bg2:#181c27;--bg3:#1f2436;--card:#232840;
+    --border:rgba(255,255,255,0.08);--text:#e8eaf0;--muted:#8b90a7;--accent:#4f8ef7;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;min-height:100vh;}
+  header{background:var(--bg2);border-bottom:1px solid var(--border);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+  .logo{display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:34px;height:34px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#fff;}
+  .logo-text{font-size:16px;font-weight:600;}
+  .logo-sub{font-size:12px;color:var(--muted);}
+  .hdr-right{display:flex;align-items:center;gap:14px;}
+  .hdr-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;}
+  .hdr-btn:hover{background:var(--card);}
+  .hdr-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .hdr-btn:disabled{opacity:0.5;cursor:not-allowed;}
+  #last-updated{font-size:12px;color:var(--muted);}
+  .main{padding:24px 28px;max-width:1600px;margin:0 auto;}
+
+  /* LOADING */
+  #loader{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;gap:18px;}
+  .spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loader-text{font-size:13px;color:var(--muted);}
+  #error-banner{display:none;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;padding:12px 16px;border-radius:10px;margin-bottom:20px;font-size:13px;}
+
+  /* DASHBOARD */
+  #dashboard{display:none;}
+  .filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px;align-items:center;}
+  select,input[type=text]{background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px;outline:none;}
+  select:focus,input[type=text]:focus{border-color:var(--accent);}
+  input[type=text]{width:220px;}
+  .chip{padding:5px 12px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid var(--border);background:var(--card);color:var(--muted);transition:all 0.15s;}
+  .chip[data-sheet="all"].active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .chip[data-sheet="Feitian"].active{background:#4f8ef7;color:#fff;border-color:#4f8ef7;}
+  .chip[data-sheet="WPOS"].active{background:#22c55e;color:#fff;border-color:#22c55e;}
+  .chip[data-sheet="Ultra"].active{background:#a78bfa;color:#fff;border-color:#a78bfa;}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px;}
+  .kpi-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden;}
+  .kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+  .kpi-card.blue::before{background:#4f8ef7;} .kpi-card.green::before{background:#22c55e;}
+  .kpi-card.amber::before{background:#f59e0b;} .kpi-card.cyan::before{background:#06b6d4;}
+  .kpi-card.purple::before{background:#818cf8;} .kpi-card.red::before{background:#ef4444;}
+  .kpi-label{font-size:12px;color:var(--muted);margin-bottom:8px;}
+  .kpi-value{font-size:28px;font-weight:700;line-height:1;}
+  .kpi-sub{font-size:11px;color:var(--muted);margin-top:4px;}
+  .kpi-card.blue .kpi-value{color:#4f8ef7;} .kpi-card.green .kpi-value{color:#22c55e;}
+  .kpi-card.amber .kpi-value{color:#f59e0b;} .kpi-card.cyan .kpi-value{color:#06b6d4;}
+  .kpi-card.purple .kpi-value{color:#818cf8;} .kpi-card.red .kpi-value{color:#ef4444;}
+
+  .charts-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px;}
+  .charts-row-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+  @media(max-width:1100px){.charts-row{grid-template-columns:1fr 1fr;}.charts-row-2{grid-template-columns:1fr;}}
+  @media(max-width:700px){.charts-row{grid-template-columns:1fr;}.main{padding:14px;}header{padding:12px 14px;}}
+
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;}
+  .panel-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:16px;}
+
+  table.data-table{width:100%;border-collapse:collapse;min-width:900px;}
+  table.data-table th{font-size:11px;color:var(--muted);text-align:left;padding:10px 12px;font-weight:500;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;}
+  table.data-table th:hover{color:var(--text);}
+  table.data-table td{padding:10px 12px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.04);white-space:nowrap;}
+  table.data-table tr:hover td{background:rgba(255,255,255,0.02);}
+  .table-wrap{overflow-x:auto;}
+  .status-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+  .device-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;}
+  .pagination{display:flex;align-items:center;justify-content:space-between;margin-top:14px;font-size:13px;color:var(--muted);}
+  .page-btns{display:flex;gap:6px;}
+  .page-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;}
+  .page-btn:disabled{opacity:0.3;cursor:not-allowed;}
+  .section-title{font-size:16px;font-weight:600;margin-bottom:12px;}
+  .no-data{color:var(--muted);font-size:13px;text-align:center;padding:30px;}
+  canvas{max-height:240px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">CT</div>
+    <div>
+      <div class="logo-text">Citytech Device Dashboard</div>
+      <div class="logo-sub">Feitian · WPOS · Ultra</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <span id="last-updated">—</span>
+    <button class="hdr-btn primary" id="refresh-btn">↻ Update Data</button>
+  </div>
+</header>
+
+<div class="main">
+  <div id="loader">
+    <div class="spinner"></div>
+    <div class="loader-text">Fetching data from Google Sheets…</div>
+  </div>
+
+  <div id="error-banner"></div>
+
+  <div id="dashboard">
+    <div class="filters">
+      <div class="chip active" data-sheet="all">All Devices</div>
+      <div class="chip" data-sheet="Feitian">Feitian</div>
+      <div class="chip" data-sheet="WPOS">WPOS</div>
+      <div class="chip" data-sheet="Ultra">Ultra</div>
+      <select id="status-filter"><option value="">All Statuses</option></select>
+      <select id="bank-filter"><option value="">All Banks</option></select>
+      <select id="district-filter"><option value="">All Districts</option></select>
+      <input type="text" id="search" placeholder="Search merchant / serial / TID…">
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card blue"><div class="kpi-label">Total Devices</div><div class="kpi-value" id="kpi-total">—</div><div class="kpi-sub">Across all 3 sheets</div></div>
+      <div class="kpi-card green"><div class="kpi-label">In Market</div><div class="kpi-value" id="kpi-market">—</div><div class="kpi-sub" id="kpi-market-pct">—</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">In Maintenance</div><div class="kpi-value" id="kpi-maint">—</div><div class="kpi-sub">Needs attention</div></div>
+      <div class="kpi-card cyan"><div class="kpi-label">In Stock</div><div class="kpi-value" id="kpi-stock">—</div><div class="kpi-sub">Available to deploy</div></div>
+      <div class="kpi-card purple"><div class="kpi-label">In Test / Config</div><div class="kpi-value" id="kpi-test">—</div><div class="kpi-sub">In Test + In Configuration</div></div>
+      <div class="kpi-card red"><div class="kpi-label">Lost / SBL</div><div class="kpi-value" id="kpi-lost">—</div><div class="kpi-sub">Requires follow-up</div></div>
+    </div>
+
+    <div class="charts-row">
+      <div class="panel"><div class="panel-title">Status Breakdown</div><canvas id="chart-status"></canvas></div>
+      <div class="panel"><div class="panel-title">Device Type Split</div><canvas id="chart-type"></canvas></div>
+      <div class="panel"><div class="panel-title">Devices by Province</div><canvas id="chart-province"></canvas></div>
+    </div>
+
+    <div class="charts-row-2">
+      <div class="panel"><div class="panel-title">Top Banks by Device Count</div><canvas id="chart-bank"></canvas></div>
+      <div class="panel"><div class="panel-title">Top Districts</div><canvas id="chart-district"></canvas></div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">Device Records</div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th data-sort="sheet">Sheet</th>
+            <th data-sort="status">Status</th>
+            <th data-sort="merchant">Merchant</th>
+            <th data-sort="serial">finPOS Serial</th>
+            <th data-sort="tid">TID</th>
+            <th data-sort="bank">Bank</th>
+            <th data-sort="district">District</th>
+            <th data-sort="province">Province</th>
+            <th data-sort="deployed">Deployed</th>
+          </tr></thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span id="page-info">Page 1</span>
+        <div class="page-btns">
+          <button class="page-btn" id="prev-page">← Prev</button>
+          <button class="page-btn" id="next-page">Next →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============== CONFIG ============== */
+const SHEETS = [
+  { name: 'Feitian', id: '1C5xecIAsWOeFUbzOh0kLRWPObGyEuwupqE3VCXU0JVc', gid: '0', color: '#4f8ef7' },
+  { name: 'WPOS',    id: '1YKvRTmFaAzfB9VPCTKANgjxfIQKxk1uQA7I0IjjWY9E', gid: '0', color: '#22c55e' },
+  { name: 'Ultra',   id: '1Xme4lujtR0tn8_2WldKluAiAos4GjLPbSgREp1aUc60', gid: '0', color: '#a78bfa' },
+];
+const REFRESH_MS = 15 * 60 * 1000; // 15 minutes
+
+const STATUS_COLORS = {
+  'In Market':'#22c55e','In Maintenance':'#f59e0b','In Test':'#a78bfa',
+  'In Stock':'#06b6d4','In Configuration':'#818cf8','In Transit to Office':'#64748b',
+  'Lost':'#ef4444','SBL':'#dc2626','Gen-Z Protest':'#f97316',
+};
+const statusColor = s => STATUS_COLORS[s] || '#94a3b8';
+
+/* ============== CSV PARSER ============== */
+function parseCSV(text){
+  const rows=[]; let row=[], cur='', inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else inQ=false; }
+      else cur+=c;
+    } else {
+      if(c==='"') inQ=true;
+      else if(c===','){ row.push(cur); cur=''; }
+      else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; }
+      else if(c==='\r'){ /* skip */ }
+      else cur+=c;
+    }
+  }
+  if(cur.length||row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r=>r.some(c=>c&&c.trim()));
+}
+
+/* Normalize a header: lowercase, strip extra whitespace and trailing junk */
+function normHeader(h){ return (h||'').toLowerCase().replace(/\s+/g,' ').trim(); }
+
+/* Find column index by matching first word(s) of header */
+function findCol(headers, ...candidates){
+  for(const cand of candidates){
+    const want = cand.toLowerCase();
+    const idx = headers.findIndex(h => h.startsWith(want));
+    if(idx >= 0) return idx;
+  }
+  return -1;
+}
+
+function mapRows(csvRows, sheetName){
+  if(!csvRows.length) return [];
+  const headers = csvRows[0].map(normHeader);
+  const col = {
+    status:   findCol(headers, 'current status', 'status'),
+    tid:      findCol(headers, 'tid'),
+    merchant: findCol(headers, 'merchant name', 'merchant'),
+    serial:   findCol(headers, 'finpos serial', 'serial'),
+    deployed: findCol(headers, 'deployed date', 'deployed'),
+    district: findCol(headers, 'district'),
+    province: findCol(headers, 'province'),
+    bank:     findCol(headers, 'bank'),
+    type:     findCol(headers, 'device type', 'type'),
+  };
+  const out = [];
+  for(let i=1;i<csvRows.length;i++){
+    const r = csvRows[i];
+    const get = k => col[k]>=0 ? (r[col[k]]||'').trim() : '';
+    const rec = {
+      sheet: sheetName,
+      status: get('status'),
+      tid: get('tid'),
+      merchant: get('merchant'),
+      serial: get('serial'),
+      deployed: get('deployed'),
+      district: get('district'),
+      province: get('province'),
+      bank: get('bank'),
+      type: get('type') || sheetName,
+    };
+    // Skip totally empty rows
+    if(!rec.status && !rec.tid && !rec.merchant && !rec.serial) continue;
+    out.push(rec);
+  }
+  return out;
+}
+
+/* ============== FETCH ============== */
+async function fetchSheet(sheet){
+  const url = `https://docs.google.com/spreadsheets/d/${sheet.id}/gviz/tq?tqx=out:csv&gid=${sheet.gid}&_=${Date.now()}`;
+  const res = await fetch(url, {cache:'no-store'});
+  if(!res.ok) throw new Error(`${sheet.name}: HTTP ${res.status}`);
+  const text = await res.text();
+  return mapRows(parseCSV(text), sheet.name);
+}
+
+async function fetchAll(){
+  const errs=[];
+  const results = await Promise.all(SHEETS.map(s =>
+    fetchSheet(s).catch(e => { errs.push(e.message); return []; })
+  ));
+  return { rows: results.flat(), errors: errs };
+}
+
+/* ============== STATE ============== */
+let allRows = [];
+let filters = { sheet:'all', status:'', bank:'', district:'', q:'' };
+let sort = { key:null, dir:1 };
+let page = 1;
+const PAGE_SIZE = 25;
+const charts = {};
+
+/* ============== RENDER ============== */
+function getFiltered(){
+  const q = filters.q.toLowerCase();
+  return allRows.filter(r=>{
+    if(filters.sheet!=='all' && r.sheet!==filters.sheet) return false;
+    if(filters.status && r.status!==filters.status) return false;
+    if(filters.bank && r.bank!==filters.bank) return false;
+    if(filters.district && r.district!==filters.district) return false;
+    if(q && !(r.merchant.toLowerCase().includes(q) || r.serial.toLowerCase().includes(q) || r.tid.toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function countBy(rows, key, limit){
+  const m = new Map();
+  rows.forEach(r=>{ const v=r[key]||'—'; m.set(v,(m.get(v)||0)+1); });
+  let arr = [...m.entries()].sort((a,b)=>b[1]-a[1]);
+  if(limit) arr = arr.slice(0,limit);
+  return arr;
+}
+
+function renderKPIs(rows){
+  const n = rows.length;
+  const c = s => rows.filter(r=>r.status===s).length;
+  document.getElementById('kpi-total').textContent = n.toLocaleString();
+  const mk = c('In Market');
+  document.getElementById('kpi-market').textContent = mk.toLocaleString();
+  document.getElementById('kpi-market-pct').textContent = n ? Math.round(mk/n*100)+'% of total' : '—';
+  document.getElementById('kpi-maint').textContent = c('In Maintenance').toLocaleString();
+  document.getElementById('kpi-stock').textContent = c('In Stock').toLocaleString();
+  document.getElementById('kpi-test').textContent  = (c('In Test')+c('In Configuration')).toLocaleString();
+  document.getElementById('kpi-lost').textContent  = (c('Lost')+c('SBL')).toLocaleString();
+}
+
+function makeChart(id, type, labels, data, colors){
+  if(charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id);
+  charts[id] = new Chart(ctx, {
+    type,
+    data: { labels, datasets:[{ data, backgroundColor: colors, borderColor:'rgba(255,255,255,0.06)', borderWidth:1 }] },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display: type!=='bar', position:'bottom', labels:{color:'#8b90a7',font:{size:11},boxWidth:10} } },
+      scales: type==='bar' ? {
+        x:{ ticks:{color:'#8b90a7',font:{size:10}}, grid:{display:false} },
+        y:{ ticks:{color:'#8b90a7',font:{size:10}}, grid:{color:'rgba(255,255,255,0.04)'} }
+      } : {}
+    }
+  });
+}
+
+function renderCharts(rows){
+  const status = countBy(rows,'status');
+  makeChart('chart-status','doughnut', status.map(x=>x[0]), status.map(x=>x[1]), status.map(x=>statusColor(x[0])));
+
+  const type = countBy(rows,'type');
+  const typeColors = type.map(x=>{ const s=SHEETS.find(s=>s.name.toLowerCase()===x[0].toLowerCase()); return s?s.color:'#64748b'; });
+  makeChart('chart-type','doughnut', type.map(x=>x[0]), type.map(x=>x[1]), typeColors);
+
+  const prov = countBy(rows,'province');
+  makeChart('chart-province','doughnut', prov.map(x=>x[0]), prov.map(x=>x[1]),
+    ['#4f8ef7','#22c55e','#f59e0b','#a78bfa','#06b6d4','#ef4444','#818cf8','#64748b']);
+
+  const bank = countBy(rows,'bank',10);
+  makeChart('chart-bank','bar', bank.map(x=>x[0]), bank.map(x=>x[1]), bank.map(()=>'#4f8ef7'));
+
+  const dist = countBy(rows,'district',10);
+  makeChart('chart-district','bar', dist.map(x=>x[0]), dist.map(x=>x[1]), dist.map(()=>'#a78bfa'));
+}
+
+function renderTable(rows){
+  let r = rows;
+  if(sort.key){
+    r = [...rows].sort((a,b)=>{
+      const av=(a[sort.key]||'').toString(), bv=(b[sort.key]||'').toString();
+      return av.localeCompare(bv) * sort.dir;
+    });
+  }
+  const totalPages = Math.max(1, Math.ceil(r.length/PAGE_SIZE));
+  if(page>totalPages) page=totalPages;
+  const start=(page-1)*PAGE_SIZE;
+  const slice = r.slice(start, start+PAGE_SIZE);
+  const tb = document.getElementById('table-body');
+  if(!slice.length){ tb.innerHTML = `<tr><td colspan="9" class="no-data">No records match the current filters.</td></tr>`; }
+  else {
+    tb.innerHTML = slice.map(row=>{
+      const sCol = SHEETS.find(s=>s.name===row.sheet)?.color || '#64748b';
+      const statCol = statusColor(row.status);
+      return `<tr>
+        <td><span class="device-tag" style="background:${sCol}22;color:${sCol}">${row.sheet}</span></td>
+        <td><span class="status-pill" style="background:${statCol}22;color:${statCol}">${row.status||'—'}</span></td>
+        <td>${row.merchant||'—'}</td>
+        <td>${row.serial||'—'}</td>
+        <td>${row.tid||'—'}</td>
+        <td>${row.bank||'—'}</td>
+        <td>${row.district||'—'}</td>
+        <td>${row.province||'—'}</td>
+        <td>${row.deployed||'—'}</td>
+      </tr>`;
+    }).join('');
+  }
+  document.getElementById('page-info').textContent = `Page ${page} of ${totalPages} · ${r.length} records`;
+  document.getElementById('prev-page').disabled = page<=1;
+  document.getElementById('next-page').disabled = page>=totalPages;
+}
+
+function populateFilterOptions(){
+  const fill = (id, vals) => {
+    const sel = document.getElementById(id);
+    const cur = sel.value;
+    const first = sel.querySelector('option').outerHTML;
+    sel.innerHTML = first + [...new Set(vals.filter(Boolean))].sort().map(v=>`<option ${v===cur?'selected':''}>${v}</option>`).join('');
+  };
+  fill('status-filter', allRows.map(r=>r.status));
+  fill('bank-filter',   allRows.map(r=>r.bank));
+  fill('district-filter',allRows.map(r=>r.district));
+}
+
+function renderAll(){
+  const rows = getFiltered();
+  renderKPIs(rows);
+  renderCharts(rows);
+  renderTable(rows);
+}
+
+/* ============== LOAD ============== */
+async function load(isRefresh){
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true; btn.textContent = '↻ Loading…';
+  if(!isRefresh){ document.getElementById('loader').style.display='flex'; document.getElementById('dashboard').style.display='none'; }
+  const banner = document.getElementById('error-banner');
+  banner.style.display='none';
+  try{
+    const { rows, errors } = await fetchAll();
+    allRows = rows;
+    populateFilterOptions();
+    document.getElementById('loader').style.display='none';
+    document.getElementById('dashboard').style.display='block';
+    renderAll();
+    if(errors.length){ banner.style.display='block'; banner.textContent = 'Some sheets failed to load: '+errors.join(' | '); }
+    document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+  } catch(e){
+    document.getElementById('loader').style.display='none';
+    banner.style.display='block'; banner.textContent = 'Failed to load data: '+e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = '↻ Update Data';
+  }
+}
+
+/* ============== EVENTS ============== */
+document.getElementById('refresh-btn').addEventListener('click', ()=>load(true));
+document.querySelectorAll('.chip').forEach(c=>{
+  c.addEventListener('click',()=>{
+    document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));
+    c.classList.add('active');
+    filters.sheet = c.dataset.sheet;
+    page=1; renderAll();
+  });
+});
+['status-filter','bank-filter','district-filter'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', e=>{
+    const key = id.replace('-filter','');
+    filters[key] = e.target.value;
+    page=1; renderAll();
+  });
+});
+document.getElementById('search').addEventListener('input', e=>{
+  filters.q = e.target.value; page=1; renderAll();
+});
+document.querySelectorAll('th[data-sort]').forEach(th=>{
+  th.addEventListener('click',()=>{
+    const k = th.dataset.sort;
+    if(sort.key===k) sort.dir = -sort.dir; else { sort.key=k; sort.dir=1; }
+    renderAll();
+  });
+});
+document.getElementById('prev-page').addEventListener('click',()=>{ page--; renderAll(); });
+document.getElementById('next-page').addEventListener('click',()=>{ page++; renderAll(); });
+
+/* ============== BOOT ============== */
+load(false);
+setInterval(()=>load(true), REFRESH_MS);
+</script>
+</body>
+</html>
