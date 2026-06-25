@@ -7,7 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
   :root {
-    --bg:#0f1117;--bg2:#181c27;--bg3:#1f2436;--card:#232840;
+    --bg:#FFFFFF;--bg2:#181c27;--bg3:#1f2436;--card:#232840;
     --border:rgba(255,255,255,0.08);--text:#e8eaf0;--muted:#8b90a7;--accent:#4f8ef7;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -293,11 +293,23 @@ function getFiltered(){
 
 function countBy(rows, key, limit){
   const m = new Map();
-  rows.forEach(r=>{ const v=r[key]||'—'; m.set(v,(m.get(v)||0)+1); });
-  let arr = [...m.entries()].sort((a,b)=>b[1]-a[1]);
-  if(limit) arr = arr.slice(0,limit);
+
+  rows.forEach(r => {
+    const v = (r[key] || '').trim();
+
+    // Skip blanks, empty strings, dashes, and nulls
+    if (!v || v === '—') return;
+
+    m.set(v, (m.get(v) || 0) + 1);
+  });
+
+  let arr = [...m.entries()].sort((a,b) => b[1] - a[1]);
+
+  if(limit) arr = arr.slice(0, limit);
+
   return arr;
 }
+
 
 function renderKPIs(rows){
   const n = rows.length;
