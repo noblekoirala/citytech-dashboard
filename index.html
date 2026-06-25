@@ -316,18 +316,26 @@ function countBy(rows, key, limit){
 
 function renderKPIs(rows){
   const n = rows.length;
-  const c = s => rows.filter(r=>r.status===s).length;
+
+  // Standard status counts
+  const c = s => rows.filter(r => r.status === s).length;
+
+  // WPOS special: In Market = "In Market" OR ("In Maintenance" AND has TID)
+  const marketCount = rows.filter(r => {
+    if (r.status === 'In Market') return true;
+    if (r.sheet === 'WPOS' && r.status === 'In Maintenance' && r.tid && r.tid.trim() !== '') return true;
+    return false;
+  }).length;
+
   document.getElementById('kpi-total').textContent = n.toLocaleString();
-  const mk = c('In Market');
-  document.getElementById('kpi-market').textContent = mk.toLocaleString();
-  document.getElementById('kpi-market-pct').textContent = n ? Math.round(mk/n*100)+'% of total' : '—';
+  document.getElementById('kpi-market').textContent = marketCount.toLocaleString();
+  document.getElementById('kpi-market-pct').textContent = n ? Math.round(marketCount / n * 100) + '% of total' : '—';
   document.getElementById('kpi-maint').textContent = c('In Maintenance').toLocaleString();
   document.getElementById('kpi-stock').textContent = c('In Stock').toLocaleString();
   document.getElementById('kpi-test').textContent  = c('In Test').toLocaleString();
-  document.getElementById('kpi-configuration').textContent  = c('In Configuration').toLocaleString();
-  document.getElementById('kpi-lost').textContent  = (c('Lost')+c('SBL')).toLocaleString();
+  document.getElementById('kpi-configuration').textContent = c('In Configuration').toLocaleString();
+  document.getElementById('kpi-lost').textContent  = (c('Lost') + c('SBL')).toLocaleString();
 }
-
 function makeChart(id, type, labels, data, colors){
   if(charts[id]) charts[id].destroy();
   const ctx = document.getElementById(id);
