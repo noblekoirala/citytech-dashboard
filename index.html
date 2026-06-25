@@ -441,7 +441,7 @@ async function load(isRefresh){
     document.getElementById('loader').style.display='none';
     banner.style.display='block'; banner.textContent = 'Failed to load data: '+e.message;
   } finally {
-    btn.disabled = false; btn.textContent = '↻ Update Data';
+    btn.disabled = false; btn.textContent = 'Update Data';
   }
 }
 
